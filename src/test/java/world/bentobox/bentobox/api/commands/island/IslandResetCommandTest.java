@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -248,7 +249,7 @@ public class IslandResetCommandTest {
         when(builder.reason(any())).thenReturn(builder);
         when(builder.name(any())).thenReturn(builder);
         when(builder.addon(any())).thenReturn(builder);
-        when(builder.build()).thenReturn(mock(Island.class));
+        when(builder.build().get()).thenReturn(mock(Island.class));
         PowerMockito.mockStatic(NewIsland.class);
         when(NewIsland.builder()).thenReturn(builder);
 
@@ -294,7 +295,7 @@ public class IslandResetCommandTest {
         when(builder.reason(any())).thenReturn(builder);
         when(builder.name(any())).thenReturn(builder);
         when(builder.addon(any())).thenReturn(builder);
-        when(builder.build()).thenReturn(mock(Island.class));
+        when(builder.build().get()).thenReturn(mock(Island.class));
         PowerMockito.mockStatic(NewIsland.class);
         when(NewIsland.builder()).thenReturn(builder);
         // Test with unlimited resets
@@ -326,7 +327,9 @@ public class IslandResetCommandTest {
         when(builder.reason(any())).thenReturn(builder);
         when(builder.name(any())).thenReturn(builder);
         when(builder.addon(any())).thenReturn(builder);
-        when(builder.build()).thenReturn(mock(Island.class));
+        CompletableFuture<Island> islandFuture = new CompletableFuture<>();
+        islandFuture.complete(mock(Island.class));
+        when(builder.build()).thenReturn(islandFuture);
         PowerMockito.mockStatic(NewIsland.class);
         when(NewIsland.builder()).thenReturn(builder);
         // Test with unlimited resets
@@ -362,7 +365,7 @@ public class IslandResetCommandTest {
         when(builder.reason(any())).thenReturn(builder);
         when(builder.name(any())).thenReturn(builder);
         when(builder.addon(any())).thenReturn(builder);
-        when(builder.build()).thenReturn(mock(Island.class));
+        when(builder.build().get()).thenReturn(mock(Island.class));
         PowerMockito.mockStatic(NewIsland.class);
         when(NewIsland.builder()).thenReturn(builder);
 
@@ -434,7 +437,7 @@ public class IslandResetCommandTest {
         when(builder.reason(any())).thenReturn(builder);
         when(builder.name(any())).thenReturn(builder);
         when(builder.addon(any())).thenReturn(builder);
-        when(builder.build()).thenReturn(mock(Island.class));
+        when(builder.build().get()).thenReturn(mock(Island.class));
         PowerMockito.mockStatic(NewIsland.class);
         when(NewIsland.builder()).thenReturn(builder);
 

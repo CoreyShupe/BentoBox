@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -52,7 +53,6 @@ import world.bentobox.bentobox.panels.IslandCreationPanel;
 
 /**
  * @author tastybento
- *
  */
 @RunWith(PowerMockRunner.class)
 @PrepareForTest({Bukkit.class, BentoBox.class, NewIsland.class, IslandCreationPanel.class})
@@ -147,7 +147,9 @@ public class IslandCreateCommandTest {
         when(builder.name(Mockito.anyString())).thenReturn(builder);
         when(builder.addon(addon)).thenReturn(builder);
         when(builder.reason(any())).thenReturn(builder);
-        when(builder.build()).thenReturn(mock(Island.class));
+        CompletableFuture<Island> newCompletableFuture = new CompletableFuture<>();
+        newCompletableFuture.complete(mock(Island.class));
+        when(builder.build()).thenReturn(newCompletableFuture);
 
         // Bundles manager
         when(plugin.getBlueprintsManager()).thenReturn(bpm);
@@ -230,6 +232,7 @@ public class IslandCreateCommandTest {
 
     /**
      * Test method for {@link world.bentobox.bentobox.api.commands.island.IslandCreateCommand#execute(world.bentobox.bentobox.api.user.User, java.lang.String, java.util.List)}.
+     *
      * @throws IOException
      */
     @Test
@@ -250,6 +253,7 @@ public class IslandCreateCommandTest {
 
     /**
      * Test method for {@link world.bentobox.bentobox.api.commands.island.IslandCreateCommand#execute(world.bentobox.bentobox.api.user.User, java.lang.String, java.util.List)}.
+     *
      * @throws IOException
      */
     @Test
@@ -259,8 +263,14 @@ public class IslandCreateCommandTest {
         // Has permission
         when(bpm.checkPerm(any(), any(), any())).thenReturn(true);
 
-        when(builder.build()).thenThrow(new IOException("commands.island.create.unable-create-island"));
-        assertFalse(cc.execute(user, "", Collections.singletonList("custom")));
+        CompletableFuture<Island> badFuture = new CompletableFuture<>();
+        badFuture.completeExceptionally(new IOException("commands.island.create.unable-create-island"));
+        when(builder.build()).thenReturn(badFuture);
+        // this is now true because we don't fail the command due to bad input
+        // instead we fail internally, since it's a delayed task the task has been successfully started
+        // when the delayed task fails there's no real way to update the command result
+        // creating a blocking result is not a valid solution here
+        assertTrue(cc.execute(user, "", Collections.singletonList("custom")));
         verify(user).sendMessage("commands.island.create.creating-island");
         verify(user).sendMessage("commands.island.create.unable-create-island");
         verify(plugin).logError("Could not create island for player. commands.island.create.unable-create-island");
@@ -302,6 +312,7 @@ public class IslandCreateCommandTest {
 
     /**
      * Test method for {@link world.bentobox.bentobox.api.commands.island.IslandCreateCommand#execute(world.bentobox.bentobox.api.user.User, java.lang.String, java.util.List)}.
+     *
      * @throws IOException
      */
     @Test

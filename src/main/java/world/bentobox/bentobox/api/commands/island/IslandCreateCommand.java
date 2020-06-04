@@ -1,10 +1,6 @@
 package world.bentobox.bentobox.api.commands.island;
 
-import java.io.IOException;
-import java.util.List;
-
 import org.eclipse.jdt.annotation.Nullable;
-
 import world.bentobox.bentobox.api.commands.CompositeCommand;
 import world.bentobox.bentobox.api.events.island.IslandEvent.Reason;
 import world.bentobox.bentobox.api.user.User;
@@ -12,6 +8,9 @@ import world.bentobox.bentobox.database.objects.Island;
 import world.bentobox.bentobox.managers.BlueprintsManager;
 import world.bentobox.bentobox.managers.island.NewIsland;
 import world.bentobox.bentobox.panels.IslandCreationPanel;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * /island create - Create an island.
@@ -22,6 +21,7 @@ public class IslandCreateCommand extends CompositeCommand {
 
     /**
      * Command to create an island
+     *
      * @param islandCommand - parent command
      */
     public IslandCreateCommand(CompositeCommand islandCommand) {
@@ -73,7 +73,7 @@ public class IslandCreateCommand extends CompositeCommand {
                 return false;
             }
             // Make island
-            return makeIsland(user, name);
+            makeIsland(user, name);
         } else {
             // Show panel only if there are multiple bundles available
             if (getPlugin().getBlueprintsManager().getBlueprintBundles(getAddon()).size() > 1) {
@@ -81,27 +81,35 @@ public class IslandCreateCommand extends CompositeCommand {
                 IslandCreationPanel.openPanel(this, user, label);
                 return true;
             }
-            return makeIsland(user, BlueprintsManager.DEFAULT_BUNDLE_NAME);
-        }
-    }
-
-    private boolean makeIsland(User user, String name) {
-        user.sendMessage("commands.island.create.creating-island");
-        try {
-            NewIsland.builder()
-            .player(user)
-            .addon(getAddon())
-            .reason(Reason.CREATE)
-            .name(name)
-            .build();
-        } catch (IOException e) {
-            getPlugin().logError("Could not create island for player. " + e.getMessage());
-            user.sendMessage(e.getMessage());
-            return false;
-        }
-        if (getSettings().isResetCooldownOnCreate()) {
-            getParent().getSubCommand("reset").ifPresent(resetCommand -> resetCommand.setCooldown(user.getUniqueId(), getSettings().getResetCooldown()));
+            makeIsland(user, BlueprintsManager.DEFAULT_BUNDLE_NAME);
         }
         return true;
+    }
+
+    private CompletableFuture<Boolean> makeIsland(User user, String name) { // this result is always bubbled & ignored
+        CompletableFuture<Boolean> completableFuture = new CompletableFuture<>();
+        user.sendMessage("commands.island.create.creating-island");
+        NewIsland.builder()
+                .player(user)
+                .addon(getAddon())
+                .reason(Reason.CREATE)
+                .name(name)
+                .build()
+                .exceptionally(throwable -> {
+                    getPlugin().logError("Could not create island for player. " + throwable.getMessage());
+                    user.sendMessage(throwable.getMessage());
+                    completableFuture.complete(false);
+                    return null;
+                })
+                .thenAccept(island -> {
+                    if (island != null) {
+                        if (getSettings().isResetCooldownOnCreate()) {
+                            getParent().getSubCommand("reset")
+                                    .ifPresent(resetCommand -> resetCommand.setCooldown(user.getUniqueId(), getSettings().getResetCooldown()));
+                        }
+                        completableFuture.complete(true);
+                    }
+                });
+        return completableFuture;
     }
 }

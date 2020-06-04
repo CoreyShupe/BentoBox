@@ -1,13 +1,10 @@
 package world.bentobox.bentobox.managers.island;
 
-import java.io.IOException;
-
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.World.Environment;
 import org.bukkit.util.Vector;
-
 import world.bentobox.bentobox.BStats;
 import world.bentobox.bentobox.BentoBox;
 import world.bentobox.bentobox.api.addons.GameModeAddon;
@@ -18,10 +15,13 @@ import world.bentobox.bentobox.api.user.User;
 import world.bentobox.bentobox.database.objects.Island;
 import world.bentobox.bentobox.managers.BlueprintsManager;
 
+import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+
 /**
  * Create and paste a new island
- * @author tastybento
  *
+ * @author tastybento
  */
 public class NewIsland {
     private BentoBox plugin;
@@ -32,10 +32,11 @@ public class NewIsland {
     private String name;
     private final boolean noPaste;
     private GameModeAddon addon;
+    private final CompletableFuture<IOException> exceptionCompletableFuture;
 
     private NewIslandLocationStrategy locationStrategy;
 
-    public NewIsland(Builder builder) throws IOException {
+    public NewIsland(Builder builder) {
         plugin = BentoBox.getInstance();
         this.user = builder.user2;
         this.reason = builder.reason2;
@@ -49,7 +50,11 @@ public class NewIsland {
             this.locationStrategy = new DefaultNewIslandLocationStrategy();
         }
 
-        newIsland(builder.oldIsland2);
+        exceptionCompletableFuture = newIsland(builder.oldIsland2);
+    }
+
+    public CompletableFuture<IOException> getExceptionCompletableFuture() {
+        return exceptionCompletableFuture;
     }
 
     /**
@@ -61,6 +66,7 @@ public class NewIsland {
 
     /**
      * Start building a new island
+     *
      * @return New island builder object
      */
     public static Builder builder() {
@@ -69,6 +75,7 @@ public class NewIsland {
 
     /**
      * Build a new island for a player
+     *
      * @author tastybento
      */
     public static class Builder {
@@ -95,6 +102,7 @@ public class NewIsland {
 
         /**
          * Sets the reason
+         *
          * @param reason reason, can only be {@link Reason#CREATE} or {@link Reason#RESET}.
          */
         public Builder reason(Reason reason) {
@@ -107,6 +115,7 @@ public class NewIsland {
 
         /**
          * Set the addon
+         *
          * @param addon a game mode addon
          */
         public Builder addon(GameModeAddon addon) {
@@ -141,24 +150,35 @@ public class NewIsland {
         }
 
         /**
-         * @return Island
-         * @throws Exception
+         * @return Completable future of Island with possible exceptions.
          */
-        public Island build() throws IOException {
+        public CompletableFuture<Island> build() {
+            CompletableFuture<Island> islandCompletableFuture = new CompletableFuture<>();
             if (user2 != null) {
                 NewIsland newIsland = new NewIsland(this);
-                return newIsland.getIsland();
+                newIsland.getExceptionCompletableFuture().exceptionally(IOException::new)
+                        .thenAccept(exception -> {
+                            if (exception == null) {
+                                islandCompletableFuture.complete(newIsland.getIsland());
+                            } else {
+                                islandCompletableFuture.completeExceptionally(exception);
+                            }
+                        });
+            } else {
+                islandCompletableFuture.completeExceptionally(new IOException("Insufficient parameters. Must have a user!"));
             }
-            throw new IOException("Insufficient parameters. Must have a user!");
+            return islandCompletableFuture;
         }
     }
 
     /**
      * Makes an island.
+     *
      * @param oldIsland old island that is being replaced, if any
-     * @throws IOException - if an island cannot be made. Message is the tag to show the user.
+     * @return CompletableFuture with exception - if an island cannot be made. Message is the tag to show the user.
      */
-    public void newIsland(Island oldIsland) throws IOException {
+    public CompletableFuture<IOException> newIsland(final Island oldIsland) {
+        CompletableFuture<IOException> exceptionFuture = new CompletableFuture<>(); // this is just so we can bubble up the exception
         Location next = null;
         if (plugin.getIslands().hasIsland(world, user)) {
             // Island exists, it just needs pasting
@@ -174,19 +194,35 @@ public class NewIsland {
         }
         // If the reservation fails, then we need to make a new island anyway
         if (next == null) {
-            next = this.locationStrategy.getNextLocation(world);
-            if (next == null) {
-                plugin.logError("Failed to make island - no unoccupied spot found.");
-                plugin.logError("If the world was imported, try multiple times until all unowned islands are known.");
-                throw new IOException("commands.island.create.cannot-create-island");
-            }
-            // Add to the grid
-            island = plugin.getIslands().createIsland(next, user.getUniqueId());
-            if (island == null) {
-                plugin.logError("Failed to make island! Island could not be added to the grid.");
-                throw new IOException("commands.island.create.unable-create-island");
-            }
+            this.locationStrategy.getNextLocationAsync(world).whenComplete((location, throwable) -> {
+                if (throwable != null) {
+                    exceptionFuture.completeExceptionally(throwable);
+                    return;
+                }
+                if (location == null) {
+                    plugin.logError("Failed to make island - no unoccupied spot found.");
+                    plugin.logError("If the world was imported, try multiple times until all unowned islands are known.");
+                    exceptionFuture.complete(new IOException("commands.island.create.cannot-create-island"));
+                    return;
+                }
+                // Add to the grid
+                island = plugin.getIslands().createIsland(location, user.getUniqueId());
+                if (island == null) {
+                    plugin.logError("Failed to make island! Island could not be added to the grid.");
+                    exceptionFuture.complete(new IOException("commands.island.create.unable-create-island"));
+                    return;
+                }
+                completeNewIsland(oldIsland, location);
+                exceptionFuture.complete(null);
+            });
+        } else {
+            completeNewIsland(oldIsland, next);
+            exceptionFuture.complete(null);
         }
+        return exceptionFuture;
+    }
+
+    private void completeNewIsland(Island oldIsland, Location next) {
         // Clear any old home locations (they should be clear, but just in case)
         plugin.getPlayers().clearHomeLocations(world, user.getUniqueId());
         // Set home location
@@ -214,14 +250,14 @@ public class NewIsland {
         }
         // Get the new BlueprintBundle if it was changed
         switch (reason) {
-        case CREATE:
-            name = ((IslandEvent.IslandCreateEvent) event).getBlueprintBundle().getUniqueId();
-            break;
-        case RESET:
-            name = ((IslandEvent.IslandResetEvent) event).getBlueprintBundle().getUniqueId();
-            break;
-        default:
-            break;
+            case CREATE:
+                name = ((IslandEvent.IslandCreateEvent) event).getBlueprintBundle().getUniqueId();
+                break;
+            case RESET:
+                name = ((IslandEvent.IslandResetEvent) event).getBlueprintBundle().getUniqueId();
+                break;
+            default:
+                break;
         }
 
         // Task to run after creating the island
@@ -271,22 +307,22 @@ public class NewIsland {
         // Fire exit event
         Reason reasonDone = Reason.CREATED;
         switch (reason) {
-        case CREATE:
-            reasonDone = Reason.CREATED;
-            break;
-        case RESET:
-            reasonDone = Reason.RESETTED;
-            break;
-        default:
-            break;
+            case CREATE:
+                reasonDone = Reason.CREATED;
+                break;
+            case RESET:
+                reasonDone = Reason.RESETTED;
+                break;
+            default:
+                break;
         }
         IslandEvent.builder()
-        .involvedPlayer(user.getUniqueId())
-        .reason(reasonDone)
-        .island(island)
-        .location(island.getCenter())
-        .oldIsland(oldIsland)
-        .build();
+                .involvedPlayer(user.getUniqueId())
+                .reason(reasonDone)
+                .island(island)
+                .location(island.getCenter())
+                .oldIsland(oldIsland)
+                .build();
 
     }
 }

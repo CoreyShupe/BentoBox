@@ -180,7 +180,7 @@ public class NewIslandTest {
     @Test
     public void testBuilderNoUser(){
         try {
-            NewIsland.builder().build();
+            NewIsland.builder().build().get();
         } catch (Exception e) {
             assertEquals("Insufficient parameters. Must have a user!", e.getMessage());
         }
@@ -192,7 +192,7 @@ public class NewIslandTest {
      */
     @Test
     public void testBuilder() throws Exception {
-        NewIsland.builder().addon(addon).name(NAME).player(user).noPaste().reason(Reason.CREATE).oldIsland(oldIsland).build();
+        NewIsland.builder().addon(addon).name(NAME).player(user).noPaste().reason(Reason.CREATE).oldIsland(oldIsland).build().get();
         // Verifications
         verify(im).save(eq(island));
         verify(island).setFlagsDefaults();
@@ -213,7 +213,7 @@ public class NewIslandTest {
     @Test
     public void testBuilderReset() throws Exception {
         when(builder.build()).thenReturn(ire);
-        NewIsland.builder().addon(addon).name(NAME).player(user).noPaste().reason(Reason.RESET).oldIsland(oldIsland).build();
+        NewIsland.builder().addon(addon).name(NAME).player(user).noPaste().reason(Reason.RESET).oldIsland(oldIsland).build().get();
         // Verifications
         verify(im).save(eq(island));
         verify(island).setFlagsDefaults();
@@ -233,7 +233,7 @@ public class NewIslandTest {
      */
     @Test
     public void testBuilderNoOldIsland() throws Exception {
-        NewIsland.builder().addon(addon).name(NAME).player(user).noPaste().reason(Reason.CREATE).build();
+        NewIsland.builder().addon(addon).name(NAME).player(user).noPaste().reason(Reason.CREATE).build().get();
         // Verifications
         verify(im).save(eq(island));
         verify(island).setFlagsDefaults();
@@ -252,7 +252,7 @@ public class NewIslandTest {
      */
     @Test
     public void testBuilderNoOldIslandPaste() throws Exception {
-        NewIsland.builder().addon(addon).name(NAME).player(user).reason(Reason.CREATE).build();
+        NewIsland.builder().addon(addon).name(NAME).player(user).reason(Reason.CREATE).build().get();
         // Verifications
         verify(im).save(eq(island));
         verify(island).setFlagsDefaults();
@@ -272,7 +272,7 @@ public class NewIslandTest {
     @Test
     public void testBuilderHasIsland() throws Exception {
         when(im.hasIsland(any(), any(User.class))).thenReturn(true);
-        NewIsland.builder().addon(addon).name(NAME).player(user).noPaste().reason(Reason.CREATE).oldIsland(oldIsland).build();
+        NewIsland.builder().addon(addon).name(NAME).player(user).noPaste().reason(Reason.CREATE).oldIsland(oldIsland).build().get();
         // Verifications
         verify(im).save(eq(island));
         verify(island).setFlagsDefaults();
@@ -295,7 +295,7 @@ public class NewIslandTest {
     public void testBuilderHasIslandFail() throws Exception {
         when(im.getIsland(any(), any(User.class))).thenReturn(null);
         when(im.hasIsland(any(), any(User.class))).thenReturn(true);
-        NewIsland.builder().addon(addon).name(NAME).player(user).noPaste().reason(Reason.CREATE).oldIsland(oldIsland).build();
+        NewIsland.builder().addon(addon).name(NAME).player(user).noPaste().reason(Reason.CREATE).oldIsland(oldIsland).build().get();
         // Verifications
         verify(im).save(eq(island));
         verify(island).setFlagsDefaults();
@@ -318,7 +318,7 @@ public class NewIslandTest {
     public void testBuilderHasIslandFailnoReserve() throws Exception {
         when(island.isReserved()).thenReturn(false);
         when(im.hasIsland(any(), any(User.class))).thenReturn(true);
-        NewIsland.builder().addon(addon).name(NAME).player(user).noPaste().reason(Reason.CREATE).oldIsland(oldIsland).build();
+        NewIsland.builder().addon(addon).name(NAME).player(user).noPaste().reason(Reason.CREATE).oldIsland(oldIsland).build().get();
         // Verifications
         verify(im).save(eq(island));
         verify(island).setFlagsDefaults();

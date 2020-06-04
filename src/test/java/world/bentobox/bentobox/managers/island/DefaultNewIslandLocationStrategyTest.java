@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -36,7 +37,6 @@ import world.bentobox.bentobox.util.Util;
 
 /**
  * @author tastybento
- *
  */
 @RunWith(PowerMockRunner.class)
 @PrepareForTest(Util.class)
@@ -115,22 +115,30 @@ public class DefaultNewIslandLocationStrategyTest {
     }
 
     /**
-     * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#getNextLocation(org.bukkit.World)}.
+     * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#getNextLocationAsync(org.bukkit.World)}.
      */
     @Test
     public void testGetNextLocationSuccess() {
-        assertEquals(location,dnils.getNextLocation(world));
+        try {
+            assertEquals(location, dnils.getNextLocationAsync(world).get());
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
         verify(im).setLast(location);
     }
 
     /**
-     * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#getNextLocation(org.bukkit.World)}.
+     * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#getNextLocationAsync(org.bukkit.World)}.
      */
     @Test
     public void testGetNextLocationFailBlocks() {
         when(adjBlock.getType()).thenReturn(Material.STONE);
         when(adjBlock.isEmpty()).thenReturn(false);
-        assertNull(dnils.getNextLocation(world));
+        try {
+            assertNull(dnils.getNextLocationAsync(world).get());
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
         verify(plugin).logError("Could not find a free spot for islands! Is this world empty?");
         verify(plugin).logError("Blocks around center locations: 20 max 20");
         verify(plugin).logError("Known islands: 0 max unlimited.");
@@ -138,7 +146,7 @@ public class DefaultNewIslandLocationStrategyTest {
     }
 
     /**
-     * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#getNextLocation(org.bukkit.World)}.
+     * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#getNextLocationAsync(org.bukkit.World)}.
      */
     @SuppressWarnings("unchecked")
     @Test
@@ -146,12 +154,16 @@ public class DefaultNewIslandLocationStrategyTest {
         Optional<Island> opIsland = Optional.of(new Island());
         Optional<Island> emptyIsland = Optional.empty();
         when(im.getIslandAt(any())).thenReturn(opIsland, opIsland, opIsland, opIsland, emptyIsland);
-        assertEquals(location,dnils.getNextLocation(world));
+        try {
+            assertEquals(location, dnils.getNextLocationAsync(world).get());
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
         verify(im).setLast(location);
     }
-    
+
     /**
-     * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#getNextLocation(org.bukkit.World)}.
+     * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#getNextLocationAsync(org.bukkit.World)}.
      */
     @Test
     public void testGetNextLocationSuccessSomeIslands10() {
@@ -159,8 +171,12 @@ public class DefaultNewIslandLocationStrategyTest {
         Optional<Island> emptyIsland = Optional.empty();
         count = 0;
         //long time = System.currentTimeMillis();
-        when(im.getIslandAt(any())).thenAnswer(i -> count++ > 10 ? emptyIsland :opIsland);
-        assertEquals(location,dnils.getNextLocation(world));
+        when(im.getIslandAt(any())).thenAnswer(i -> count++ > 10 ? emptyIsland : opIsland);
+        try {
+            assertEquals(location, dnils.getNextLocationAsync(world).get());
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
         //System.out.println(System.currentTimeMillis() - time);
         verify(im).setLast(location);
     }
@@ -169,65 +185,65 @@ public class DefaultNewIslandLocationStrategyTest {
      * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#isIsland(org.bukkit.Location)}.
      */
     @Test
-    public void testIsIslandIslandFound() {
+    public void testIsIslandIslandFound() throws ExecutionException, InterruptedException {
         Optional<Island> opIsland = Optional.of(new Island());
         when(im.getIslandAt(any())).thenReturn(opIsland);
-        assertEquals(Result.ISLAND_FOUND, dnils.isIsland(location));
+        assertEquals(Result.ISLAND_FOUND, dnils.isIsland(location).get());
     }
 
     /**
      * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#isIsland(org.bukkit.Location)}.
      */
     @Test
-    public void testIsIslandIslandInDeletion() {
+    public void testIsIslandIslandInDeletion() throws ExecutionException, InterruptedException {
         when(idm.inDeletion(any())).thenReturn(true);
-        assertEquals(Result.ISLAND_FOUND, dnils.isIsland(location));
+        assertEquals(Result.ISLAND_FOUND, dnils.isIsland(location).get());
     }
 
     /**
      * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#isIsland(org.bukkit.Location)}.
      */
     @Test
-    public void testIsIslandChunkNotGenerated() {
+    public void testIsIslandChunkNotGenerated() throws ExecutionException, InterruptedException {
         when(Util.isChunkGenerated(any())).thenReturn(false);
-        assertEquals(Result.FREE, dnils.isIsland(location));
+        assertEquals(Result.FREE, dnils.isIsland(location).get());
     }
 
     /**
      * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#isIsland(org.bukkit.Location)}.
      */
     @Test
-    public void testIsIslandUseOwnGenerator() {
+    public void testIsIslandUseOwnGenerator() throws ExecutionException, InterruptedException {
         when(iwm.isUseOwnGenerator(eq(world))).thenReturn(true);
-        assertEquals(Result.FREE, dnils.isIsland(location));
+        assertEquals(Result.FREE, dnils.isIsland(location).get());
     }
 
     /**
      * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#isIsland(org.bukkit.Location)}.
      */
     @Test
-    public void testIsIslandFreeAirBlocks() {
-        assertEquals(Result.FREE, dnils.isIsland(location));
+    public void testIsIslandFreeAirBlocks() throws ExecutionException, InterruptedException {
+        assertEquals(Result.FREE, dnils.isIsland(location).get());
     }
 
     /**
      * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#isIsland(org.bukkit.Location)}.
      */
     @Test
-    public void testIsIslandFreeWaterBlocks() {
+    public void testIsIslandFreeWaterBlocks() throws ExecutionException, InterruptedException {
         when(adjBlock.getType()).thenReturn(Material.WATER);
         when(adjBlock.isEmpty()).thenReturn(false);
-        assertEquals(Result.FREE, dnils.isIsland(location));
+        assertEquals(Result.FREE, dnils.isIsland(location).get());
     }
 
     /**
      * Test method for {@link world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy#isIsland(org.bukkit.Location)}.
      */
     @Test
-    public void testIsIslandBlocksInArea() {
+    public void testIsIslandBlocksInArea() throws ExecutionException, InterruptedException {
         when(adjBlock.getType()).thenReturn(Material.STONE);
         when(adjBlock.isEmpty()).thenReturn(false);
-        assertEquals(Result.BLOCKS_IN_AREA, dnils.isIsland(location));
+        assertEquals(Result.BLOCKS_IN_AREA, dnils.isIsland(location).get());
     }
 
 }

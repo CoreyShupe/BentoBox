@@ -474,6 +474,7 @@ public class BlueprintsManager {
                 new BlueprintPaster(plugin, bp, addon.getNetherWorld(), island, null);
             }
         }
+
         // Make end island
         if (bb.getBlueprint(World.Environment.THE_END) != null
                 && addon.getWorldSettings().isEndGenerate()
