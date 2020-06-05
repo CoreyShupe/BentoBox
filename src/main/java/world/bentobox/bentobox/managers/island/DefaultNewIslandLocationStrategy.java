@@ -27,12 +27,8 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
      */
     protected static final Integer MAX_UNOWNED_ISLANDS = 20;
 
-    private final Set<LocationHash> locationHashSet;
+    private final static Set<LocationHash> LOCATION_HASHES = new HashSet<>();
     protected BentoBox plugin = BentoBox.getInstance();
-
-    public DefaultNewIslandLocationStrategy() {
-        this.locationHashSet = new HashSet<>();
-    }
 
     protected enum Result {
         ISLAND_FOUND, BLOCKS_IN_AREA, FREE
@@ -164,12 +160,12 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
     private synchronized Result getFinalResult(Location location, boolean remove) {
         LocationHash hash = new LocationHash(location);
         if (remove) {
-            locationHashSet.remove(hash);
+            LOCATION_HASHES.remove(hash);
             return Result.BLOCKS_IN_AREA;
         }
         // this line prevents the data race of 2 islands with 1 location
-        if (locationHashSet.contains(hash)) return Result.ISLAND_FOUND;
-        locationHashSet.add(hash);
+        if (LOCATION_HASHES.contains(hash)) return Result.ISLAND_FOUND;
+        LOCATION_HASHES.add(hash);
         return Result.FREE;
     }
 

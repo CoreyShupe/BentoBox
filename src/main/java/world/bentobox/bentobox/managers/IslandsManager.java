@@ -50,6 +50,7 @@ import world.bentobox.bentobox.database.Database;
 import world.bentobox.bentobox.database.objects.Island;
 import world.bentobox.bentobox.database.objects.IslandDeletion;
 import world.bentobox.bentobox.lists.Flags;
+import world.bentobox.bentobox.managers.island.DefaultNewIslandLocationStrategy;
 import world.bentobox.bentobox.managers.island.IslandCache;
 import world.bentobox.bentobox.util.DeleteIslandChunks;
 import world.bentobox.bentobox.util.Util;
@@ -367,6 +368,7 @@ public class IslandsManager {
             // Remove blocks from world
             new DeleteIslandChunks(plugin, new IslandDeletion(island));
         }
+        new DefaultNewIslandLocationStrategy().cleanLocation(island.getCenter());
     }
 
     public int getIslandCount() {
