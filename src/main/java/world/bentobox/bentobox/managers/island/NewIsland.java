@@ -342,6 +342,7 @@ public class NewIsland {
                 .location(island.getCenter())
                 .oldIsland(oldIsland)
                 .build();
-
+        // this tidys up the strategy to remove this as a valid location
+        locationStrategy.cleanLocation(island.getCenter());
     }
 }

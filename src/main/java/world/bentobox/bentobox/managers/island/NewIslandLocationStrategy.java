@@ -15,4 +15,6 @@ public interface NewIslandLocationStrategy {
     Location getNextLocation(World world);
 
     CompletableFuture<Location> getNextLocationAsync(World world);
+
+    void cleanLocation(Location location);
 }

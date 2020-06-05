@@ -156,6 +156,10 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
         return resultFuture;
     }
 
+    @Override public void cleanLocation(Location location) {
+        getFinalResult(location, true);
+    }
+
     // this NEEDS to be synchronized, only one thread at a time to synchronize the data race
     private synchronized Result getFinalResult(Location location, boolean remove) {
         LocationHash hash = new LocationHash(location);
