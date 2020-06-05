@@ -16,6 +16,9 @@ import world.bentobox.bentobox.database.objects.Island;
 import world.bentobox.bentobox.managers.BlueprintsManager;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -24,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
  * @author tastybento
  */
 public class NewIsland {
+    private final static Set<UUID> IN_PROCESS = new HashSet<>();
     private BentoBox plugin;
     private Island island;
     private final User user;
@@ -173,11 +177,22 @@ public class NewIsland {
 
     /**
      * Makes an island.
+     * <p>
+     * This must be synchronous since it has a data race check. Only one thread should be able to access this.
+     * This maintains synchronization with the basic accessing thread.
      *
      * @param oldIsland old island that is being replaced, if any
      * @return CompletableFuture with exception - if an island cannot be made. Message is the tag to show the user.
      */
-    public CompletableFuture<IOException> newIsland(final Island oldIsland) {
+    public synchronized CompletableFuture<IOException> newIsland(final Island oldIsland) {
+        // this is an immediate error before even looking
+        if (IN_PROCESS.contains(user.getUniqueId())) {
+            plugin.logError("Failed to make island - data race found.");
+            plugin.logError("User attempted to make an island whilst already creating an island.");
+            return CompletableFuture.supplyAsync(() -> new IOException("commands.island.create.cannot-create-island"));
+        }
+        // this NEEDS to be synchronized to stop future islands from being made promptly
+        IN_PROCESS.add(user.getUniqueId());
         CompletableFuture<IOException> exceptionFuture = new CompletableFuture<>(); // this is just so we can bubble up the exception
         Location next = null;
         if (plugin.getIslands().hasIsland(world, user)) {
@@ -194,7 +209,7 @@ public class NewIsland {
         }
         // If the reservation fails, then we need to make a new island anyway
         if (next == null) {
-            this.locationStrategy.getNextLocationAsync(world).whenComplete((location, throwable) -> {
+            this.locationStrategy.getNextLocationAsync(world).whenComplete((location, throwable) -> { // when complete is sync
                 if (throwable != null) {
                     exceptionFuture.completeExceptionally(throwable);
                     return;
@@ -213,7 +228,11 @@ public class NewIsland {
                     return;
                 }
                 completeNewIsland(oldIsland, location);
-                exceptionFuture.complete(null);
+                exceptionFuture.complete(null); // this is necessary before remove since it sets up cool-down
+                // final step
+                // this is the only remove call, and it should be synced up, and even if it fails to be read correctly
+                // it will still act properly since we only care about the `add` functionality
+                IN_PROCESS.remove(user.getUniqueId()); // this should stop them from being in progress
             });
         } else {
             completeNewIsland(oldIsland, next);

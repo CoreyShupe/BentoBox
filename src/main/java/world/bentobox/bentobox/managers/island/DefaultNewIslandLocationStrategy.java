@@ -9,10 +9,7 @@ import org.bukkit.block.BlockFace;
 import world.bentobox.bentobox.BentoBox;
 import world.bentobox.bentobox.util.Util;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -30,11 +27,16 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
      */
     protected static final Integer MAX_UNOWNED_ISLANDS = 20;
 
+    private final Set<LocationHash> locationHashSet;
+    protected BentoBox plugin = BentoBox.getInstance();
+
+    public DefaultNewIslandLocationStrategy() {
+        this.locationHashSet = new HashSet<>();
+    }
+
     protected enum Result {
         ISLAND_FOUND, BLOCKS_IN_AREA, FREE
     }
-
-    protected BentoBox plugin = BentoBox.getInstance();
 
     @Override
     public Location getNextLocation(World world) {
@@ -128,7 +130,7 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
         }
         // If chunk has not been generated yet, then it's not occupied
         if (!generated) {
-            return CompletableFuture.supplyAsync(() -> Result.FREE);
+            return CompletableFuture.supplyAsync(() -> getFinalResult(location, false));
         }
         // Block check
         CompletableFuture<Result> resultFuture = new CompletableFuture<>();
@@ -144,13 +146,27 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
                             !block.getRelative(bf).isEmpty() && !block.getRelative(bf).getType().equals(Material.WATER))
                     ) {
                         // Block found
+                        getFinalResult(location, true);
                         plugin.getIslands().createIsland(location);
                         resultFuture.complete(Result.BLOCKS_IN_AREA);
                         return;
                     }
-                    resultFuture.complete(Result.FREE);
+                    resultFuture.complete(getFinalResult(location, false));
                 });
         return resultFuture;
+    }
+
+    // this NEEDS to be synchronized, only one thread at a time to synchronize the data race
+    private synchronized Result getFinalResult(Location location, boolean remove) {
+        LocationHash hash = new LocationHash(location);
+        if (remove) {
+            locationHashSet.remove(hash);
+            return Result.BLOCKS_IN_AREA;
+        }
+        // this line prevents the data race of 2 islands with 1 location
+        if (locationHashSet.contains(hash)) return Result.ISLAND_FOUND;
+        locationHashSet.add(hash);
+        return Result.FREE;
     }
 
     /**
@@ -186,5 +202,33 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
         }
         lastIsland.setZ(lastIsland.getZ() - d);
         return lastIsland;
+    }
+
+    private static class LocationHash {
+        private final UUID id;
+        private final int x;
+        private final int y;
+        private final int z;
+
+        private LocationHash(Location location) {
+            this.id = Objects.requireNonNull(location.getWorld()).getUID();
+            this.x = location.getBlockX();
+            this.y = location.getBlockY();
+            this.z = location.getBlockZ();
+        }
+
+        @Override public boolean equals(Object object) {
+            if (this == object) return true;
+            if (object == null || getClass() != object.getClass()) return false;
+            LocationHash that = (LocationHash) object;
+            return x == that.x &&
+                    y == that.y &&
+                    z == that.z &&
+                    Objects.equals(id, that.id);
+        }
+
+        @Override public int hashCode() {
+            return Objects.hash(id, x, y, z);
+        }
     }
 }
